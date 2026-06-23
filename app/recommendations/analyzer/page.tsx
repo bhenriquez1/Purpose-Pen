@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Textarea } from "@/components/ui/Field";
+import { useAuth } from "@/lib/firebase/AuthProvider";
 import type { LetterAnalysis } from "@/types/recommendation";
 
 export default function LetterAnalyzerPage() {
@@ -12,15 +13,20 @@ export default function LetterAnalyzerPage() {
   const [analysis, setAnalysis] = useState<LetterAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { getIdToken } = useAuth();
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
     setError(null);
     setAnalysis(null);
     try {
+      const idToken = await getIdToken();
       const response = await fetch("/api/recommendations/analyze-letter", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({ letterText }),
       });
       const data = await response.json();

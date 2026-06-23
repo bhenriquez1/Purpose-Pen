@@ -3,10 +3,22 @@ import { Card } from "@/components/ui/Card";
 
 const dashboardCards = [
   {
-    href: "/recommendations",
-    title: "Letter of Recommendation Suite",
+    href: "/application-center",
+    title: "Application Management Center",
     description:
-      "Build recommender packets, draft letters, track status, and analyze letters for dental, medical, and graduate applications.",
+      "Track recommender status and deadlines, manage your applicant profile, and build committee packets and checklists.",
+  },
+  {
+    href: "/essays",
+    title: "Personal Statement & Essay Studio",
+    description:
+      "Draft and refine your personal statement, with brainstorming, outlining, and supplemental essay tools on the way.",
+  },
+  {
+    href: "/recommendations",
+    title: "Letter of Recommendation Builder",
+    description:
+      "Request letters, capture a recommender's authentic voice, draft and analyze letters for dental, medical, and graduate applications.",
   },
 ];
 

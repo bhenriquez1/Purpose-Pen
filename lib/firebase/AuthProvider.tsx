@@ -2,39 +2,60 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
   type ReactNode,
 } from "react";
-import { onAuthStateChanged, signInAnonymously, type User } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  type User,
+} from "firebase/auth";
 import { auth, isFirebaseConfigured } from "./config";
 
-/**
- * Purpose Pen does not yet have a real authentication system in this repo.
- * This provider signs the user in anonymously so Firestore data can be
- * scoped per-user. Swap this out for real sign-in (email/password, Google,
- * etc.) once Purpose Pen's actual auth flow exists.
- */
-const LOCAL_UID = "local-user";
+export type AccessStatus =
+  | "not_configured"
+  | "checking"
+  | "unauthenticated"
+  | "pending_approval"
+  | "allowed";
+
+export type AccessRole = "owner" | "member" | null;
 
 interface AuthContextValue {
   user: User | null;
   uid: string;
-  loading: boolean;
-  configured: boolean;
+  email: string | null;
+  status: AccessStatus;
+  role: AccessRole;
+  getIdToken: () => Promise<string | null>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string) => Promise<void>;
+  signOutUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
-  uid: LOCAL_UID,
-  loading: true,
-  configured: false,
+  uid: "",
+  email: null,
+  status: "not_configured",
+  role: null,
+  getIdToken: async () => null,
+  signInWithEmail: async () => {},
+  signUpWithEmail: async () => {},
+  signOutUser: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(isFirebaseConfigured);
+  const [status, setStatus] = useState<AccessStatus>(
+    isFirebaseConfigured ? "checking" : "not_configured"
+  );
+  const [role, setRole] = useState<AccessRole>(null);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !auth) {
@@ -43,28 +64,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const activeAuth = auth;
 
     const unsubscribe = onAuthStateChanged(activeAuth, async (current) => {
-      if (current) {
-        setUser(current);
-        setLoading(false);
-      } else {
-        try {
-          await signInAnonymously(activeAuth);
-        } catch {
-          setLoading(false);
+      setUser(current);
+      if (!current) {
+        setRole(null);
+        setStatus("unauthenticated");
+        return;
+      }
+
+      setStatus("checking");
+      try {
+        const idToken = await current.getIdToken();
+        const response = await fetch("/api/auth/access", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        });
+        const data = await response.json();
+        if (response.ok && data.allowed) {
+          setRole(data.role);
+          setStatus("allowed");
+        } else {
+          setRole(null);
+          setStatus("pending_approval");
         }
+      } catch {
+        setRole(null);
+        setStatus("pending_approval");
       }
     });
 
     return () => unsubscribe();
   }, []);
 
+  const getIdToken = useCallback(async () => {
+    if (!user) return null;
+    return user.getIdToken();
+  }, [user]);
+
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
+    if (!auth) throw new Error("Authentication is not configured.");
+    await signInWithEmailAndPassword(auth, email, password);
+  }, []);
+
+  const signUpWithEmail = useCallback(async (email: string, password: string) => {
+    if (!auth) throw new Error("Authentication is not configured.");
+    await createUserWithEmailAndPassword(auth, email, password);
+  }, []);
+
+  const signOutUser = useCallback(async () => {
+    if (!auth) return;
+    await firebaseSignOut(auth);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
         user,
-        uid: user?.uid ?? LOCAL_UID,
-        loading,
-        configured: isFirebaseConfigured,
+        uid: user?.uid ?? "",
+        email: user?.email ?? null,
+        status,
+        role,
+        getIdToken,
+        signInWithEmail,
+        signUpWithEmail,
+        signOutUser,
       }}
     >
       {children}

@@ -13,7 +13,8 @@ import {
 import type { ApplicantProfile, LetterDraft, Recommender } from "@/types/recommendation";
 
 export function useRecommenders() {
-  const { uid, loading: authLoading } = useAuth();
+  const { uid, status } = useAuth();
+  const authLoading = status !== "allowed";
   const [recommenders, setRecommenders] = useState<Recommender[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +61,8 @@ export function useRecommenders() {
 }
 
 export function useApplicantProfile() {
-  const { uid, loading: authLoading } = useAuth();
+  const { uid, status } = useAuth();
+  const authLoading = status !== "allowed";
   const [profile, setProfile] = useState<ApplicantProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +98,8 @@ export function useApplicantProfile() {
 }
 
 export function useLetterDrafts() {
-  const { uid, loading: authLoading } = useAuth();
+  const { uid, status } = useAuth();
+  const authLoading = status !== "allowed";
   const [drafts, setDrafts] = useState<LetterDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

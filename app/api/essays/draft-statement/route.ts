@@ -1,35 +1,30 @@
 import { NextResponse } from "next/server";
 import { AINotConfiguredError, callClaude } from "@/lib/ai/anthropic";
-import { buildLetterAnalysisPrompt } from "@/lib/ai/prompts";
+import { buildPersonalStatementPrompt } from "@/lib/ai/prompts";
 import { AdminNotConfiguredError } from "@/lib/firebase/admin";
 import { requireAuthedUser, UnauthorizedError, ForbiddenError } from "@/lib/auth/verifyRequest";
 import { logAuditEvent } from "@/lib/audit/server";
-import type { LetterAnalysis } from "@/types/recommendation";
 
-interface AnalyzeLetterRequest {
-  letterText: string;
+interface DraftStatementRequest {
+  topic: string;
+  notes: string;
 }
 
 export async function POST(request: Request) {
   try {
     const user = await requireAuthedUser(request);
-    const body = (await request.json()) as AnalyzeLetterRequest;
+    const body = (await request.json()) as DraftStatementRequest;
 
-    const { system, prompt } = buildLetterAnalysisPrompt(body.letterText);
-    const raw = await callClaude({ system, prompt, maxTokens: 1000 });
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("AI response did not contain valid JSON");
-    }
-    const analysis = JSON.parse(jsonMatch[0]) as LetterAnalysis;
+    const { system, prompt } = buildPersonalStatementPrompt(body.topic, body.notes);
+    const content = await callClaude({ system, prompt, maxTokens: 1200 });
 
     await logAuditEvent({
       uid: user.uid,
       email: user.email,
-      action: "ai_analyze_letter",
+      action: "ai_draft_personal_statement",
     });
 
-    return NextResponse.json(analysis);
+    return NextResponse.json({ content });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: error.message }, { status: 401 });

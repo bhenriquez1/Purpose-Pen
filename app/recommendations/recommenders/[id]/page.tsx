@@ -27,7 +27,8 @@ const TABS = ["Details", "Personality & Attributes", "Voice Capture", "Letter Dr
 export default function RecommenderDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { uid, loading: authLoading } = useAuth();
+  const { uid, status } = useAuth();
+  const authLoading = status !== "allowed";
   const { profile: applicantProfile } = useApplicantProfile();
 
   const [recommender, setRecommender] = useState<Recommender | null>(null);

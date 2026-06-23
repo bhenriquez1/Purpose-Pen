@@ -263,6 +263,14 @@ export interface LetterAnalysis {
   suggestions: string[];
 }
 
+export interface PersonalStatement {
+  id: string;
+  topic: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CommitteePacketSelection {
   recommenderIds: string[];
   includeResume: boolean;

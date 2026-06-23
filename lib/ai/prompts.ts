@@ -149,6 +149,25 @@ export function buildRequestEmailPrompt(
   return { system, prompt };
 }
 
+export function buildPersonalStatementPrompt(topic: string, notes: string) {
+  const system = [
+    "You are an admissions essay coach helping an applicant draft a personal statement.",
+    "Write in the applicant's likely voice: genuine, specific, and reflective rather than generic or cliché.",
+    "Use concrete details and anecdotes from the notes provided. Do not invent facts not given to you.",
+  ].join(" ");
+
+  const prompt = [
+    `Topic or prompt: ${topic}`,
+    "",
+    "=== Applicant notes / brainstorming ===",
+    notes || "(no notes provided)",
+    "",
+    "Write a complete, specific personal statement draft based on this.",
+  ].join("\n");
+
+  return { system, prompt };
+}
+
 export function buildLetterAnalysisPrompt(letterText: string) {
   const system = [
     "You are an admissions consultant analyzing a letter of recommendation.",

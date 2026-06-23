@@ -8,7 +8,11 @@ function section(title: string, items: string[]): string {
     .join("\n")}\n`;
 }
 
-export function buildRecommenderPacketMarkdown(profile: ApplicantProfile): string {
+function watermark(uid: string): string {
+  return `\n---\n_Generated for account ${uid} on ${new Date().toISOString()} via Purpose Pen. Proprietary — not for redistribution._\n`;
+}
+
+export function buildRecommenderPacketMarkdown(profile: ApplicantProfile, uid: string): string {
   const name = profile.applicantName || "Applicant";
   return [
     `# Recommender Packet — ${name}`,
@@ -21,6 +25,7 @@ export function buildRecommenderPacketMarkdown(profile: ApplicantProfile): strin
     section("Work History", profile.workHistory),
     section("Leadership Experience", profile.leadership),
     section("Awards and Honors", profile.awards),
+    watermark(uid),
   ]
     .filter(Boolean)
     .join("\n");
@@ -32,8 +37,9 @@ export function buildCommitteePacketMarkdown(params: {
   letters: { recommenderName: string; content: string }[];
   resume?: string;
   personalStatement?: string;
+  uid: string;
 }): string {
-  const { applicantProfile, letters, resume, personalStatement } = params;
+  const { applicantProfile, letters, resume, personalStatement, uid } = params;
   const name = applicantProfile.applicantName || "Applicant";
 
   const lettersSection = letters.length
@@ -53,6 +59,7 @@ export function buildCommitteePacketMarkdown(params: {
     section("Leadership Summary", applicantProfile.leadership),
     section("Work History Summary", applicantProfile.workHistory),
     lettersSection ? `## Recommendation Letters\n\n${lettersSection}` : "",
+    watermark(uid),
   ]
     .filter(Boolean)
     .join("\n\n");
