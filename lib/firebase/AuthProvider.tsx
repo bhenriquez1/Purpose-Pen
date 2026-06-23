@@ -40,6 +40,7 @@ interface AuthContextValue {
   email: string | null;
   status: AccessStatus;
   role: AccessRole;
+  isDevBypass: boolean;
   getIdToken: () => Promise<string | null>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
@@ -52,6 +53,7 @@ const AuthContext = createContext<AuthContextValue>({
   email: null,
   status: "not_configured",
   role: null,
+  isDevBypass: false,
   getIdToken: async () => null,
   signInWithEmail: async () => {},
   signUpWithEmail: async () => {},
@@ -132,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: devBypassAuth ? "dev@local" : user?.email ?? null,
         status,
         role,
+        isDevBypass: devBypassAuth,
         getIdToken,
         signInWithEmail,
         signUpWithEmail,
