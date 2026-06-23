@@ -1,5 +1,6 @@
 import { AdminNotConfiguredError, verifyIdToken } from "@/lib/firebase/admin";
 import { resolveRole, type AccessRole } from "@/lib/auth/access";
+import { DEV_BYPASS_USER, isDevBypassActive } from "@/lib/auth/devBypass";
 
 export class UnauthorizedError extends Error {}
 export class ForbiddenError extends Error {}
@@ -21,6 +22,10 @@ function extractIdToken(request: Request): string | null {
  * server routes that perform AI generation or other gated actions.
  */
 export async function requireAuthedUser(request: Request): Promise<AuthedUser> {
+  if (isDevBypassActive()) {
+    return { uid: DEV_BYPASS_USER.uid, email: DEV_BYPASS_USER.email, role: DEV_BYPASS_USER.role };
+  }
+
   const idToken = extractIdToken(request);
   if (!idToken) {
     throw new UnauthorizedError("Missing authentication token.");
