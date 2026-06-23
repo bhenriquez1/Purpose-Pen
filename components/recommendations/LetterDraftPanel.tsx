@@ -4,7 +4,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { FieldGroup, Select, Textarea } from "@/components/ui/Field";
+import { useAuth } from "@/lib/firebase/AuthProvider";
 import { saveLetterDraft } from "@/lib/recommendations/repository";
+import { logClientEvent } from "@/lib/audit/client";
 import {
   LETTER_TYPE_LABELS,
   type ApplicantProfile,
@@ -30,15 +32,20 @@ export function LetterDraftPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const { getIdToken } = useAuth();
 
   const handleGenerate = async () => {
     setGenerating(true);
     setError(null);
     setSavedMessage(null);
     try {
+      const idToken = await getIdToken();
       const response = await fetch("/api/recommendations/draft-letter", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           recommender,
           letterType,
@@ -69,6 +76,7 @@ export function LetterDraftPanel({
         content,
         voiceMatchScore,
       });
+      await logClientEvent(getIdToken, "save_letter_draft", { recommenderId: recommender.id });
       setSavedMessage("Draft saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save draft");

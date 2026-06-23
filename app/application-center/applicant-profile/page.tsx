@@ -8,10 +8,13 @@ import { FieldGroup, Input } from "@/components/ui/Field";
 import { ListField } from "@/components/ui/ListField";
 import { useApplicantProfile } from "@/lib/recommendations/hooks";
 import { buildRecommenderPacketMarkdown, downloadMarkdown } from "@/lib/recommendations/documents";
+import { useAuth } from "@/lib/firebase/AuthProvider";
+import { logClientEvent } from "@/lib/audit/client";
 import type { ApplicantProfile } from "@/types/recommendation";
 
 export default function ApplicantProfilePage() {
   const { profile, loading, error, save } = useApplicantProfile();
+  const { uid, getIdToken } = useAuth();
   const [draft, setDraft] = useState<ApplicantProfile | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
@@ -42,8 +45,9 @@ export default function ApplicantProfilePage() {
   const handleGeneratePacket = () => {
     downloadMarkdown(
       `${draft.applicantName || "applicant"}-recommender-packet.md`,
-      buildRecommenderPacketMarkdown(draft)
+      buildRecommenderPacketMarkdown(draft, uid)
     );
+    void logClientEvent(getIdToken, "export_recommender_packet");
   };
 
   return (

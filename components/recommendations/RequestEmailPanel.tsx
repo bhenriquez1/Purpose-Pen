@@ -4,7 +4,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { FieldGroup, Select, Textarea } from "@/components/ui/Field";
+import { useAuth } from "@/lib/firebase/AuthProvider";
 import { saveRequestEmail } from "@/lib/recommendations/repository";
+import { logClientEvent } from "@/lib/audit/client";
 import type { EmailTone, Recommender, RequestEmailType } from "@/types/recommendation";
 
 const TYPES: { value: RequestEmailType; label: string }[] = [
@@ -36,15 +38,20 @@ export function RequestEmailPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const { getIdToken } = useAuth();
 
   const handleGenerate = async () => {
     setGenerating(true);
     setError(null);
     setSavedMessage(null);
     try {
+      const idToken = await getIdToken();
       const response = await fetch("/api/recommendations/request-email", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           recommender,
           type,
@@ -69,6 +76,7 @@ export function RequestEmailPanel({
     setError(null);
     try {
       await saveRequestEmail(uid, { recommenderId: recommender.id, type, tone, content });
+      await logClientEvent(getIdToken, "save_request_email", { recommenderId: recommender.id, type });
       setSavedMessage("Email saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save email");

@@ -6,11 +6,11 @@ import { Card } from "@/components/ui/Card";
 import { useAuth } from "@/lib/firebase/AuthProvider";
 
 const STEPS = [
-  { id: "cv", label: "Build CV", href: "/recommendations/applicant-profile" },
+  { id: "cv", label: "Build CV", href: "/application-center/applicant-profile" },
   {
     id: "personal_statement",
     label: "Build personal statement",
-    href: "/recommendations/committee-packet",
+    href: "/essays",
   },
   {
     id: "request_letters",
@@ -25,12 +25,12 @@ const STEPS = [
   {
     id: "supplemental_essays",
     label: "Generate supplemental essays",
-    href: "/recommendations/analyzer",
+    href: "/essays",
   },
   {
     id: "export_packet",
     label: "Export application packet",
-    href: "/recommendations/committee-packet",
+    href: "/application-center/committee-packet",
   },
 ];
 

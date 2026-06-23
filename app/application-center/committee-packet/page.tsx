@@ -9,6 +9,7 @@ import { useApplicantProfile, useLetterDrafts, useRecommenders } from "@/lib/rec
 import { useAuth } from "@/lib/firebase/AuthProvider";
 import { saveCommitteePacket } from "@/lib/recommendations/repository";
 import { buildCommitteePacketMarkdown, downloadMarkdown } from "@/lib/recommendations/documents";
+import { logClientEvent } from "@/lib/audit/client";
 import type { CommitteePacketSelection } from "@/types/recommendation";
 
 const TOGGLE_OPTIONS: { key: keyof CommitteePacketSelection; label: string }[] = [
@@ -22,7 +23,7 @@ const TOGGLE_OPTIONS: { key: keyof CommitteePacketSelection; label: string }[] =
 ];
 
 export default function CommitteePacketPage() {
-  const { uid } = useAuth();
+  const { uid, getIdToken } = useAuth();
   const { recommenders, loading: recommendersLoading } = useRecommenders();
   const { drafts } = useLetterDrafts();
   const { profile } = useApplicantProfile();
@@ -85,9 +86,11 @@ export default function CommitteePacketPage() {
         letters,
         resume: selection.includeResume ? resume : undefined,
         personalStatement: selection.includePersonalStatement ? personalStatement : undefined,
+        uid,
       });
 
       downloadMarkdown(`${profile.applicantName || "applicant"}-committee-packet.md`, markdown);
+      void logClientEvent(getIdToken, "export_committee_packet");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to build committee packet");
     } finally {

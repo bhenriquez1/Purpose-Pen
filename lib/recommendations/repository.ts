@@ -3,6 +3,7 @@ import type {
   ApplicantProfile,
   CommitteePacketSelection,
   LetterDraft,
+  PersonalStatement,
   Recommender,
   RequestEmail,
 } from "@/types/recommendation";
@@ -13,6 +14,7 @@ const COLLECTIONS = {
   letterDrafts: "letterDrafts",
   requestEmails: "requestEmails",
   committeePackets: "committeePackets",
+  personalStatements: "personalStatements",
 } as const;
 
 const APPLICANT_PROFILE_ID = "profile";
@@ -159,4 +161,32 @@ export async function saveCommitteePacket(
   };
   await saveItem(uid, COLLECTIONS.committeePackets, toSave);
   return toSave;
+}
+
+// --- Personal statements -------------------------------------------------
+
+export function listPersonalStatements(uid: string) {
+  return listItems<PersonalStatement>(uid, COLLECTIONS.personalStatements);
+}
+
+export async function savePersonalStatement(
+  uid: string,
+  statement: Omit<PersonalStatement, "id" | "createdAt" | "updatedAt"> & { id?: string }
+) {
+  const timestamp = nowIso();
+  const existing = statement.id
+    ? await getItem<PersonalStatement>(uid, COLLECTIONS.personalStatements, statement.id)
+    : null;
+  const toSave: PersonalStatement = {
+    ...statement,
+    id: statement.id ?? newId(),
+    createdAt: existing?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
+  await saveItem(uid, COLLECTIONS.personalStatements, toSave);
+  return toSave;
+}
+
+export function deletePersonalStatement(uid: string, id: string) {
+  return deleteItem(uid, COLLECTIONS.personalStatements, id);
 }
