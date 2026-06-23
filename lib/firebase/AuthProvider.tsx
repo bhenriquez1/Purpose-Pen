@@ -18,12 +18,20 @@ import {
 import { auth, isFirebaseConfigured } from "./config";
 
 /**
- * Local-only escape hatch so the app can be previewed without Firebase set up.
- * Requires NODE_ENV !== "production" so it can never take effect in a real deployment,
- * even if the env var is accidentally left set.
+ * Escape hatch so the app can be previewed without Firebase set up.
+ * Deliberately works even when NODE_ENV=="production" (Next.js's `next start`
+ * always forces that), since this also has to work on Render's production
+ * build. Safe only because proxy.ts puts a SITE_PASSWORD Basic Auth wall in
+ * front of the whole app for any publicly reachable deployment — never set
+ * this flag on a deployment without SITE_PASSWORD also set.
  */
-const devBypassAuth =
-  process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true" && process.env.NODE_ENV !== "production";
+const devBypassAuth = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true";
+
+const DEV_BYPASS_USER = {
+  id: "dev-user",
+  email: "developer@purposepen.local",
+  role: "owner" as const,
+};
 
 export type AccessStatus =
   | "not_configured"
@@ -130,10 +138,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        uid: devBypassAuth ? "dev-bypass-user" : user?.uid ?? "",
-        email: devBypassAuth ? "dev@local" : user?.email ?? null,
+        uid: devBypassAuth ? DEV_BYPASS_USER.id : user?.uid ?? "",
+        email: devBypassAuth ? DEV_BYPASS_USER.email : user?.email ?? null,
         status,
-        role,
+        role: devBypassAuth ? DEV_BYPASS_USER.role : role,
         isDevBypass: devBypassAuth,
         getIdToken,
         signInWithEmail,
