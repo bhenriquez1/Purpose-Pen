@@ -17,6 +17,14 @@ import {
 } from "firebase/auth";
 import { auth, isFirebaseConfigured } from "./config";
 
+/**
+ * Local-only escape hatch so the app can be previewed without Firebase set up.
+ * Requires NODE_ENV !== "production" so it can never take effect in a real deployment,
+ * even if the env var is accidentally left set.
+ */
+const devBypassAuth =
+  process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true" && process.env.NODE_ENV !== "production";
+
 export type AccessStatus =
   | "not_configured"
   | "checking"
@@ -53,12 +61,12 @@ const AuthContext = createContext<AuthContextValue>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<AccessStatus>(
-    isFirebaseConfigured ? "checking" : "not_configured"
+    devBypassAuth ? "allowed" : isFirebaseConfigured ? "checking" : "not_configured"
   );
-  const [role, setRole] = useState<AccessRole>(null);
+  const [role, setRole] = useState<AccessRole>(devBypassAuth ? "owner" : null);
 
   useEffect(() => {
-    if (!isFirebaseConfigured || !auth) {
+    if (devBypassAuth || !isFirebaseConfigured || !auth) {
       return;
     }
     const activeAuth = auth;
@@ -120,8 +128,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        uid: user?.uid ?? "",
-        email: user?.email ?? null,
+        uid: devBypassAuth ? "dev-bypass-user" : user?.uid ?? "",
+        email: devBypassAuth ? "dev@local" : user?.email ?? null,
         status,
         role,
         getIdToken,
