@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { AdminNotConfiguredError, verifyIdToken } from "@/lib/firebase/admin";
 import { resolveRole } from "@/lib/auth/access";
 import { logAuditEvent } from "@/lib/audit/server";
+import { createSessionToken, SESSION_COOKIE_NAME, SESSION_COOKIE_OPTIONS } from "@/lib/auth/session";
 
 interface AccessRequest {
   idToken: string;
@@ -31,11 +32,22 @@ export async function POST(request: Request) {
       metadata: { allowed: Boolean(role) },
     });
 
-    if (!role) {
-      return NextResponse.json({ allowed: false, role: null, email });
+    if (!role || !email) {
+      const response = NextResponse.json({ allowed: false, role: null, email });
+      response.cookies.delete(SESSION_COOKIE_NAME);
+      return response;
     }
 
-    return NextResponse.json({ allowed: true, role, email });
+    const response = NextResponse.json({ allowed: true, role, email });
+    try {
+      const sessionToken = await createSessionToken({ uid: decoded.uid, email, role });
+      response.cookies.set(SESSION_COOKIE_NAME, sessionToken, SESSION_COOKIE_OPTIONS);
+    } catch {
+      // SESSION_SECRET not configured — middleware will fail closed on
+      // protected routes until it's set; the Firebase-only check above still
+      // governs the client-side AuthGate.
+    }
+    return response;
   } catch (error) {
     if (error instanceof AdminNotConfiguredError) {
       return NextResponse.json({ error: error.message }, { status: 503 });

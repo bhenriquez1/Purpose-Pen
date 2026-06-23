@@ -16,22 +16,18 @@ import {
   type User,
 } from "firebase/auth";
 import { auth, isFirebaseConfigured } from "./config";
+import { DEV_BYPASS_USER } from "@/lib/auth/devBypass";
 
 /**
- * Escape hatch so the app can be previewed without Firebase set up.
- * Deliberately works even when NODE_ENV=="production" (Next.js's `next start`
- * always forces that), since this also has to work on Render's production
- * build. Safe only because proxy.ts puts a SITE_PASSWORD Basic Auth wall in
- * front of the whole app for any publicly reachable deployment — never set
- * this flag on a deployment without SITE_PASSWORD also set.
+ * Client-side mirror of the bypass flag for UI purposes only (show the
+ * dashboard + dev banner instead of "Setup Required"). NEXT_PUBLIC_* vars are
+ * the only env vars visible in the browser bundle, so this can't see
+ * ALLOW_PRODUCTION_DEV_BYPASS — the real enforcement (including the
+ * production-safety gate) happens server-side in proxy.ts and
+ * requireAuthedUser. If this flag is on but the server-side gate isn't,
+ * protected pages/API calls will redirect/401 despite this optimistic UI.
  */
 const devBypassAuth = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true";
-
-const DEV_BYPASS_USER = {
-  id: "dev-user",
-  email: "developer@purposepen.local",
-  role: "owner" as const,
-};
 
 export type AccessStatus =
   | "not_configured"
@@ -130,6 +126,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOutUser = useCallback(async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // best-effort — the Firebase sign-out below still ends the client session
+    }
     if (!auth) return;
     await firebaseSignOut(auth);
   }, []);
@@ -138,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        uid: devBypassAuth ? DEV_BYPASS_USER.id : user?.uid ?? "",
+        uid: devBypassAuth ? DEV_BYPASS_USER.uid : user?.uid ?? "",
         email: devBypassAuth ? DEV_BYPASS_USER.email : user?.email ?? null,
         status,
         role: devBypassAuth ? DEV_BYPASS_USER.role : role,
