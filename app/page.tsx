@@ -3,22 +3,28 @@ import { Card } from "@/components/ui/Card";
 
 const dashboardCards = [
   {
-    href: "/application-center",
+    href: "/application-management",
     title: "Application Management Center",
     description:
       "Track recommender status and deadlines, manage your applicant profile, and build committee packets and checklists.",
   },
   {
-    href: "/essays",
+    href: "/essay-studio",
     title: "Personal Statement & Essay Studio",
     description:
       "Draft and refine your personal statement, with brainstorming, outlining, and supplemental essay tools on the way.",
   },
   {
-    href: "/recommendations",
+    href: "/letter-builder",
     title: "Letter of Recommendation Builder",
     description:
       "Request letters, capture a recommender's authentic voice, draft and analyze letters for dental, medical, and graduate applications.",
+  },
+  {
+    href: "/reapplicant-archive",
+    title: "Reapplicant Archive",
+    description:
+      "Keep a record of past application cycles, feedback, and lessons learned so each reapplication is stronger than the last.",
   },
 ];
 
@@ -35,8 +41,8 @@ export default function Home() {
 
         <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2">
           {dashboardCards.map((card) => (
-            <Link key={card.href} href={card.href}>
-              <Card className="h-full transition hover:border-zinc-400 hover:shadow-md dark:hover:border-zinc-600">
+            <Link key={card.href} href={card.href} className="block cursor-pointer">
+              <Card className="h-full cursor-pointer transition hover:border-zinc-400 hover:shadow-md dark:hover:border-zinc-600">
                 <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
                   {card.title}
                 </h2>

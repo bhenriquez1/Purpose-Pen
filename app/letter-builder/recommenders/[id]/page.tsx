@@ -89,7 +89,7 @@ export default function RecommenderDetailPage() {
       <div className="flex items-center justify-between">
         <div>
           <button
-            onClick={() => router.push("/recommendations/recommenders")}
+            onClick={() => router.push("/letter-builder/recommenders")}
             className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
           >
             ← Back to tracker

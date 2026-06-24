@@ -2,14 +2,16 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 const NAV_ITEMS = [
-  { href: "/application-center", label: "Overview" },
-  { href: "/recommendations/recommenders", label: "Recommendation Tracker" },
-  { href: "/application-center/applicant-profile", label: "Applicant Profile & Packet" },
-  { href: "/application-center/committee-packet", label: "Committee Packet" },
-  { href: "/application-center/workflow", label: "Checklist & Deadlines" },
+  { href: "/letter-builder", label: "Overview" },
+  { href: "/letter-builder/recommenders", label: "Recommenders" },
+  { href: "/letter-builder/analyzer", label: "Letter Analyzer" },
 ];
 
-export default function ApplicationCenterLayout({ children }: { children: ReactNode }) {
+export default function RecommendationsLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   return (
     <div className="flex-1 bg-zinc-50 dark:bg-black">
       <div className="mx-auto max-w-6xl px-6 py-10">
@@ -21,7 +23,7 @@ export default function ApplicationCenterLayout({ children }: { children: ReactN
             ← Dashboard
           </Link>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Application Management Center
+            Letter of Recommendation Builder
           </h1>
         </div>
 

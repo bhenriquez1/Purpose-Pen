@@ -41,11 +41,7 @@ const OPEN_API_PATHS = new Set(["/api/auth/access", "/api/auth/logout"]);
 const PROTECTED_PREFIXES = [
   "/dashboard",
   "/application-management",
-  "/application-center",
-  "/personal-statement",
   "/essay-studio",
-  "/essays",
-  "/recommendations",
   "/letter-builder",
   "/reapplicant-archive",
   "/admin",
