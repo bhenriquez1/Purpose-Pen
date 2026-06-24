@@ -75,7 +75,7 @@ export default function RecommendersPage() {
                 >
                   <td className="px-4 py-3">
                     <Link
-                      href={`/recommendations/recommenders/${r.id}`}
+                      href={`/letter-builder/recommenders/${r.id}`}
                       className="font-medium text-zinc-900 hover:underline dark:text-zinc-50"
                     >
                       {r.name}

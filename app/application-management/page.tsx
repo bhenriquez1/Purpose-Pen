@@ -8,23 +8,29 @@ import { STATUS_LABELS, type RecommendationStatus } from "@/types/recommendation
 
 const OVERVIEW_LINKS = [
   {
-    href: "/recommendations/recommenders",
-    title: "Recommenders",
-    description: "Manage recommenders, then capture voice, personality, and draft letters per person.",
+    href: "/letter-builder/recommenders",
+    title: "Recommendation Tracker",
+    description: "Manage recommenders, statuses, deadlines, and follow-ups.",
   },
   {
-    href: "/recommendations/analyzer",
-    title: "Letter Analyzer",
-    description: "Paste a letter to check strength, specificity, and credibility.",
+    href: "/application-management/applicant-profile",
+    title: "Applicant Profile & Recommender Packet",
+    description:
+      "Collect achievements, volunteer work, shadowing, leadership, and generate a recommender packet.",
   },
   {
-    href: "/application-center",
-    title: "Application Management Center",
-    description: "Track status, deadlines, applicant profile, and committee packets.",
+    href: "/application-management/committee-packet",
+    title: "Committee Packet Builder",
+    description: "Combine letters, CV, personal statement, and summaries into one packet.",
+  },
+  {
+    href: "/application-management/workflow",
+    title: "Application Checklist & Deadlines",
+    description: "Step-by-step workflow from CV to exported application packet.",
   },
 ];
 
-export default function RecommendationsOverview() {
+export default function ApplicationCenterOverview() {
   const { recommenders, loading, error } = useRecommenders();
 
   const counts = recommenders.reduce<Record<string, number>>((acc, r) => {
@@ -45,7 +51,7 @@ export default function RecommendationsOverview() {
         ) : recommenders.length === 0 ? (
           <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
             No recommenders yet.{" "}
-            <Link href="/recommendations/recommenders" className="underline">
+            <Link href="/letter-builder/recommenders" className="underline">
               Add your first recommender
             </Link>
             .

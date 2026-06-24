@@ -3,14 +3,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/firebase/AuthProvider";
 import {
+  deleteReapplicantCycle,
   deleteRecommender,
   getApplicantProfile,
   listLetterDrafts,
+  listReapplicantCycles,
   listRecommenders,
   saveApplicantProfile,
+  saveReapplicantCycle,
   saveRecommender,
 } from "./repository";
-import type { ApplicantProfile, LetterDraft, Recommender } from "@/types/recommendation";
+import type {
+  ApplicantProfile,
+  LetterDraft,
+  ReapplicantCycle,
+  Recommender,
+} from "@/types/recommendation";
 
 export function useRecommenders() {
   const { uid, status } = useAuth();
@@ -124,4 +132,50 @@ export function useLetterDrafts() {
   }, [authLoading, refresh]);
 
   return { drafts, loading: loading || authLoading, error, refresh, uid };
+}
+
+export function useReapplicantCycles() {
+  const { uid, status } = useAuth();
+  const authLoading = status !== "allowed";
+  const [cycles, setCycles] = useState<ReapplicantCycle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const items = await listReapplicantCycles(uid);
+      setCycles(items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load reapplicant archive");
+    } finally {
+      setLoading(false);
+    }
+  }, [uid]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional fetch-on-mount
+    refresh();
+  }, [authLoading, refresh]);
+
+  const upsert = useCallback(
+    async (cycle: Omit<ReapplicantCycle, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
+      const saved = await saveReapplicantCycle(uid, cycle);
+      await refresh();
+      return saved;
+    },
+    [uid, refresh]
+  );
+
+  const remove = useCallback(
+    async (id: string) => {
+      await deleteReapplicantCycle(uid, id);
+      await refresh();
+    },
+    [uid, refresh]
+  );
+
+  return { cycles, loading: loading || authLoading, error, refresh, upsert, remove, uid };
 }

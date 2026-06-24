@@ -4,6 +4,7 @@ import type {
   CommitteePacketSelection,
   LetterDraft,
   PersonalStatement,
+  ReapplicantCycle,
   Recommender,
   RequestEmail,
 } from "@/types/recommendation";
@@ -15,6 +16,7 @@ const COLLECTIONS = {
   requestEmails: "requestEmails",
   committeePackets: "committeePackets",
   personalStatements: "personalStatements",
+  reapplicantCycles: "reapplicantCycles",
 } as const;
 
 const APPLICANT_PROFILE_ID = "profile";
@@ -189,4 +191,32 @@ export async function savePersonalStatement(
 
 export function deletePersonalStatement(uid: string, id: string) {
   return deleteItem(uid, COLLECTIONS.personalStatements, id);
+}
+
+// --- Reapplicant archive -------------------------------------------------
+
+export function listReapplicantCycles(uid: string) {
+  return listItems<ReapplicantCycle>(uid, COLLECTIONS.reapplicantCycles);
+}
+
+export async function saveReapplicantCycle(
+  uid: string,
+  cycle: Omit<ReapplicantCycle, "id" | "createdAt" | "updatedAt"> & { id?: string }
+) {
+  const timestamp = nowIso();
+  const existing = cycle.id
+    ? await getItem<ReapplicantCycle>(uid, COLLECTIONS.reapplicantCycles, cycle.id)
+    : null;
+  const toSave: ReapplicantCycle = {
+    ...cycle,
+    id: cycle.id ?? newId(),
+    createdAt: existing?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
+  await saveItem(uid, COLLECTIONS.reapplicantCycles, toSave);
+  return toSave;
+}
+
+export function deleteReapplicantCycle(uid: string, id: string) {
+  return deleteItem(uid, COLLECTIONS.reapplicantCycles, id);
 }

@@ -1,29 +1,62 @@
 import { NextResponse } from "next/server";
 import { AINotConfiguredError, callClaude } from "@/lib/ai/anthropic";
-import { buildLetterDraftPrompt, buildVoiceMatchPrompt } from "@/lib/ai/prompts";
+import {
+  buildGuidedLetterPrompt,
+  buildLetterDraftPrompt,
+  buildNotesImprovePrompt,
+  buildVoiceMatchPrompt,
+} from "@/lib/ai/prompts";
 import { AdminNotConfiguredError } from "@/lib/firebase/admin";
 import { requireAuthedUser, UnauthorizedError, ForbiddenError } from "@/lib/auth/verifyRequest";
 import { logAuditEvent } from "@/lib/audit/server";
-import type { ApplicantProfile, LetterType, Recommender } from "@/types/recommendation";
+import type {
+  ApplicantProfile,
+  GuidedLetterAnswers,
+  LetterType,
+  Recommender,
+} from "@/types/recommendation";
 
 interface DraftLetterRequest {
+  mode?: "profile" | "notes" | "guided";
   recommender: Recommender;
   letterType: LetterType;
   applicantProfile: ApplicantProfile;
   applicantName: string;
+  notes?: string;
+  guidedAnswers?: GuidedLetterAnswers;
 }
 
 export async function POST(request: Request) {
   try {
     const user = await requireAuthedUser(request);
     const body = (await request.json()) as DraftLetterRequest;
+    const mode = body.mode ?? "profile";
 
-    const { system, prompt } = buildLetterDraftPrompt(
-      body.recommender,
-      body.letterType,
-      body.applicantProfile,
-      body.applicantName
-    );
+    let system: string;
+    let prompt: string;
+    if (mode === "notes") {
+      if (!body.notes?.trim()) {
+        return NextResponse.json({ error: "Notes are required." }, { status: 400 });
+      }
+      ({ system, prompt } = buildNotesImprovePrompt(
+        body.recommender,
+        body.letterType,
+        body.applicantName,
+        body.notes
+      ));
+    } else if (mode === "guided") {
+      if (!body.guidedAnswers) {
+        return NextResponse.json({ error: "Guided answers are required." }, { status: 400 });
+      }
+      ({ system, prompt } = buildGuidedLetterPrompt(body.guidedAnswers, body.letterType));
+    } else {
+      ({ system, prompt } = buildLetterDraftPrompt(
+        body.recommender,
+        body.letterType,
+        body.applicantProfile,
+        body.applicantName
+      ));
+    }
     const content = await callClaude({ system, prompt, maxTokens: 2000 });
 
     let voiceMatchScore: number | null = null;

@@ -271,6 +271,32 @@ export interface PersonalStatement {
   updatedAt: string;
 }
 
+export interface GuidedLetterAnswers {
+  applicantName: string;
+  recommenderNameTitle: string;
+  relationshipToApplicant: string;
+  howLongKnown: string;
+  settingKnown: string;
+  strongestQualities: string;
+  realExampleOrMemory: string;
+  whyRecommend: string;
+  programSchoolType: string;
+  desiredTone: string;
+}
+
+export interface ReapplicantCycle {
+  id: string;
+  cycleLabel: string;
+  schoolsApplied: string[];
+  outcome: string;
+  feedbackReceived: string;
+  lessonsLearned: string;
+  whatToImproveNextCycle: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CommitteePacketSelection {
   recommenderIds: string[];
   includeResume: boolean;
