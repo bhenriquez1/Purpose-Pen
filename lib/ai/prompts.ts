@@ -1,6 +1,7 @@
 import {
   ATTRIBUTE_LABELS,
   LETTER_TYPE_LABELS,
+  PERSPECTIVE_QUESTIONS,
   type ApplicantDraftAnswers,
   type ApplicantProfile,
   type EmailTone,
@@ -188,9 +189,12 @@ export function buildApplicantDraftPrompt(
     .filter(Boolean)
     .join("\n");
 
+  const perspectiveLabels = Object.fromEntries(
+    (PERSPECTIVE_QUESTIONS[recommenderType] ?? []).map((q) => [q.id, q.question])
+  );
   const perspectiveLines = Object.entries(answers.perspectiveAnswers)
     .filter(([, v]) => v.trim())
-    .map(([k, v]) => `- ${k}: ${v}`)
+    .map(([k, v]) => `- ${perspectiveLabels[k] ?? k}: ${v}`)
     .join("\n");
 
   const prompt = [
