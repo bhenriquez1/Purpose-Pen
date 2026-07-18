@@ -1,10 +1,12 @@
 import {
   ATTRIBUTE_LABELS,
   LETTER_TYPE_LABELS,
+  type ApplicantDraftAnswers,
   type ApplicantProfile,
   type EmailTone,
   type GuidedLetterAnswers,
   type LetterType,
+  type RecommenderType,
   type Recommender,
   type RequestEmailType,
 } from "@/types/recommendation";
@@ -158,7 +160,74 @@ export function buildGuidedLetterPrompt(answers: GuidedLetterAnswers, letterType
   return { system, prompt };
 }
 
-export type RefineAction = "professional" | "shorten" | "strengthen";
+export function buildApplicantDraftPrompt(
+  answers: ApplicantDraftAnswers,
+  letterType: LetterType,
+  recommenderType: RecommenderType
+) {
+  const system = [
+    "You are helping an applicant prepare a draft letter of recommendation that their recommender has explicitly asked them to write.",
+    "The recommender will review, edit, and approve the final letter before submitting it.",
+    "Write in the recommender's authentic voice using the voice sample provided.",
+    "Use ONLY the specific details, examples, and observations provided — do not invent facts, achievements, or experiences not mentioned.",
+    "The letter must sound like it was genuinely written by the recommender — specific, credible, and personal, not generic AI writing.",
+    "Do not use generic admissions filler phrases. Ground every claim in the specific evidence provided.",
+  ].join(" ");
+
+  const evidenceLines = [
+    answers.academicExamples ? `Academic examples: ${answers.academicExamples}` : "",
+    answers.clinicalExamples ? `Clinical / lab / field examples: ${answers.clinicalExamples}` : "",
+    answers.patientInteraction ? `Patient or client interaction: ${answers.patientInteraction}` : "",
+    answers.workEthic ? `Work ethic: ${answers.workEthic}` : "",
+    answers.leadership ? `Leadership: ${answers.leadership}` : "",
+    answers.reliability ? `Reliability: ${answers.reliability}` : "",
+    answers.professionalism ? `Professionalism: ${answers.professionalism}` : "",
+    answers.growthOverTime ? `Growth over time: ${answers.growthOverTime}` : "",
+    answers.realStoriesObservations ? `Real stories or specific observations: ${answers.realStoriesObservations}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const perspectiveLines = Object.entries(answers.perspectiveAnswers)
+    .filter(([, v]) => v.trim())
+    .map(([k, v]) => `- ${k}: ${v}`)
+    .join("\n");
+
+  const prompt = [
+    `Write a ${LETTER_TYPE_LABELS[letterType]}.`,
+    "",
+    "=== APPLICANT INFORMATION ===",
+    `Full name: ${answers.applicantFullName || "(not provided)"}`,
+    `Program type: ${answers.programType || "(not provided)"}`,
+    `Schools or application type: ${answers.schoolsOrApplicationType || "(not provided)"}`,
+    `Career goal: ${answers.careerGoal || "(not provided)"}`,
+    `Personal qualities: ${answers.personalQualities || "(not provided)"}`,
+    `Achievements and experiences: ${answers.achievements || "(not provided)"}`,
+    "",
+    "=== RECOMMENDER INFORMATION ===",
+    `Name and title: ${answers.recommenderFullName}${answers.recommenderTitle ? `, ${answers.recommenderTitle}` : ""}`,
+    `Institution / clinic / company: ${answers.recommenderInstitution || "(not provided)"}`,
+    `Relationship to applicant: ${answers.relationshipToApplicant || "(not provided)"}`,
+    `How long known: ${answers.howLongKnown || "(not provided)"}`,
+    `Context / setting: ${answers.contextKnown || "(not provided)"}`,
+    evidenceLines ? `\n=== EVIDENCE AND EXAMPLES ===\n${evidenceLines}` : "",
+    perspectiveLines ? `\n=== RECOMMENDER PERSPECTIVE (${recommenderType}) ===\n${perspectiveLines}` : "",
+    "",
+    "=== RECOMMENDER'S VOICE SAMPLE ===",
+    answers.voiceSentences
+      ? `In the recommender's own words: "${answers.voiceSentences}"`
+      : "No voice sample provided — use a professional, warm tone appropriate to this recommender's role.",
+    answers.writingSample ? `\nAdditional writing sample for voice reference:\n${answers.writingSample}` : "",
+    "",
+    "Write the complete letter now. Match the recommender's voice closely. Use every specific detail above — do not leave any piece of evidence out.",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+
+  return { system, prompt };
+}
+
+export type RefineAction = "professional" | "shorten" | "strengthen" | "add_examples";
 
 export function buildRefineLetterPrompt(letterContent: string, action: RefineAction) {
   const instructions: Record<RefineAction, string> = {
@@ -168,6 +237,8 @@ export function buildRefineLetterPrompt(letterContent: string, action: RefineAct
       "Shorten this letter while keeping its most specific, credible details and its authentic voice. Cut filler, not substance.",
     strengthen:
       "Strengthen this letter — make the praise more specific and credible, and sharpen any vague language — without inventing new facts and without losing the recommender's authentic voice.",
+    add_examples:
+      "Find every instance of vague or generic praise in this letter. Rewrite those sections to be more specific and concrete, using only the details and examples already present in the letter. Do not add new facts or fabricate experiences. Sharpen every vague claim into something specific and credible.",
   };
 
   const system = [

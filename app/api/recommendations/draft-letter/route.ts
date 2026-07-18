@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AINotConfiguredError, callClaude } from "@/lib/ai/anthropic";
 import {
+  buildApplicantDraftPrompt,
   buildGuidedLetterPrompt,
   buildLetterDraftPrompt,
   buildNotesImprovePrompt,
@@ -10,6 +11,7 @@ import { AdminNotConfiguredError } from "@/lib/firebase/admin";
 import { requireAuthedUser, UnauthorizedError, ForbiddenError } from "@/lib/auth/verifyRequest";
 import { logAuditEvent } from "@/lib/audit/server";
 import type {
+  ApplicantDraftAnswers,
   ApplicantProfile,
   GuidedLetterAnswers,
   LetterType,
@@ -17,13 +19,14 @@ import type {
 } from "@/types/recommendation";
 
 interface DraftLetterRequest {
-  mode?: "profile" | "notes" | "guided";
+  mode?: "profile" | "notes" | "guided" | "applicant_draft";
   recommender: Recommender;
   letterType: LetterType;
   applicantProfile: ApplicantProfile;
   applicantName: string;
   notes?: string;
   guidedAnswers?: GuidedLetterAnswers;
+  applicantDraftAnswers?: ApplicantDraftAnswers;
 }
 
 export async function POST(request: Request) {
@@ -49,6 +52,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Guided answers are required." }, { status: 400 });
       }
       ({ system, prompt } = buildGuidedLetterPrompt(body.guidedAnswers, body.letterType));
+    } else if (mode === "applicant_draft") {
+      if (!body.applicantDraftAnswers) {
+        return NextResponse.json({ error: "Applicant draft answers are required." }, { status: 400 });
+      }
+      ({ system, prompt } = buildApplicantDraftPrompt(
+        body.applicantDraftAnswers,
+        body.letterType,
+        body.recommender.recommenderType
+      ));
     } else {
       ({ system, prompt } = buildLetterDraftPrompt(
         body.recommender,

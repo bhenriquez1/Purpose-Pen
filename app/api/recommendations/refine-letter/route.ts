@@ -5,7 +5,7 @@ import { AdminNotConfiguredError } from "@/lib/firebase/admin";
 import { requireAuthedUser, UnauthorizedError, ForbiddenError } from "@/lib/auth/verifyRequest";
 import { logAuditEvent } from "@/lib/audit/server";
 
-const REFINE_ACTIONS: RefineAction[] = ["professional", "shorten", "strengthen"];
+const REFINE_ACTIONS: RefineAction[] = ["professional", "shorten", "strengthen", "add_examples"];
 
 interface RefineLetterRequest {
   content: string;
