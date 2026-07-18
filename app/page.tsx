@@ -18,7 +18,7 @@ const dashboardCards = [
     href: "/letter-builder",
     title: "Letter of Recommendation Builder",
     description:
-      "Request letters, capture a recommender's authentic voice, draft and analyze letters for dental, medical, and graduate applications.",
+      "Help recommenders — or applicants asked to prepare a draft — create authentic, evidence-based letters for review and approval.",
   },
   {
     href: "/reapplicant-archive",

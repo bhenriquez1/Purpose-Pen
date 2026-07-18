@@ -230,14 +230,51 @@ export interface ApplicantProfile {
   updatedAt: string;
 }
 
+export type DraftAuthor = "recommender" | "applicant";
+export type DraftApprovalStatus = "drafted" | "pending_review" | "approved";
+
 export interface LetterDraft {
   id: string;
   recommenderId: string;
   letterType: LetterType;
   content: string;
   voiceMatchScore: number | null;
+  draftedBy?: DraftAuthor;
+  approvalStatus?: DraftApprovalStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ApplicantDraftAnswers {
+  // Applicant information
+  applicantFullName: string;
+  programType: string;
+  schoolsOrApplicationType: string;
+  careerGoal: string;
+  personalQualities: string;
+  achievements: string;
+  // Recommender information
+  recommenderFullName: string;
+  recommenderTitle: string;
+  recommenderInstitution: string;
+  relationshipToApplicant: string;
+  howLongKnown: string;
+  contextKnown: string;
+  // Evidence
+  academicExamples: string;
+  clinicalExamples: string;
+  patientInteraction: string;
+  workEthic: string;
+  leadership: string;
+  reliability: string;
+  professionalism: string;
+  growthOverTime: string;
+  realStoriesObservations: string;
+  // Recommender voice
+  voiceSentences: string;
+  writingSample: string;
+  // Recommender-type-specific perspective answers, keyed by question id
+  perspectiveAnswers: Record<string, string>;
 }
 
 export type RequestEmailType = "request" | "follow_up" | "thank_you";

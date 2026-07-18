@@ -9,7 +9,11 @@ import { saveLetterDraft } from "@/lib/recommendations/repository";
 import { logClientEvent } from "@/lib/audit/client";
 import {
   LETTER_TYPE_LABELS,
+  PERSPECTIVE_QUESTIONS,
+  type ApplicantDraftAnswers,
   type ApplicantProfile,
+  type DraftApprovalStatus,
+  type DraftAuthor,
   type GuidedLetterAnswers,
   type LetterType,
   type Recommender,
@@ -17,7 +21,7 @@ import {
 
 const LETTER_TYPES = Object.entries(LETTER_TYPE_LABELS) as [LetterType, string][];
 
-type Mode = "choose" | "notes" | "guided";
+type Mode = "choose" | "recommender_choose" | "notes" | "guided" | "applicant_draft";
 
 const TONE_OPTIONS = ["formal", "warm", "clinical", "academic", "strong", "concise"];
 
@@ -28,11 +32,7 @@ const GUIDED_QUESTIONS: { key: keyof GuidedLetterAnswers; label: string; multili
   { key: "howLongKnown", label: "How long have you known the applicant?" },
   { key: "settingKnown", label: "In what setting do you know them? (class, clinic, work, lab...)" },
   { key: "strongestQualities", label: "What are the applicant's strongest qualities?", multiline: true },
-  {
-    key: "realExampleOrMemory",
-    label: "Share a real example or specific memory that shows this",
-    multiline: true,
-  },
+  { key: "realExampleOrMemory", label: "Share a real example or specific memory that shows this", multiline: true },
   { key: "whyRecommend", label: "Why do you recommend this applicant?", multiline: true },
   { key: "programSchoolType", label: "What program or school type is this for?" },
 ];
@@ -49,6 +49,23 @@ const emptyGuidedAnswers: GuidedLetterAnswers = {
   programSchoolType: "",
   desiredTone: "formal",
 };
+
+const APPROVAL_STATUS_LABELS: Record<DraftApprovalStatus, string> = {
+  drafted: "Drafted by Applicant",
+  pending_review: "Pending Recommender Review",
+  approved: "Approved by Recommender",
+};
+
+const REVIEW_HEADER =
+  "[DRAFT — FOR RECOMMENDER REVIEW]\nThis letter was prepared at your request. Please read carefully, edit as needed to reflect your own voice and observations, and submit only when you are satisfied it accurately represents your views.\n\n";
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h4 className="mt-6 mb-2 border-b border-zinc-200 pb-1 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+      {children}
+    </h4>
+  );
+}
 
 export function LetterDraftPanel({
   uid,
@@ -71,6 +88,9 @@ export function LetterDraftPanel({
 
   const [mode, setMode] = useState<Mode>("choose");
   const [notes, setNotes] = useState("");
+  const [generatedBy, setGeneratedBy] = useState<DraftAuthor>("recommender");
+  const [approvalStatus, setApprovalStatus] = useState<DraftApprovalStatus>("drafted");
+
   const [guidedAnswers, setGuidedAnswers] = useState<GuidedLetterAnswers>({
     ...emptyGuidedAnswers,
     applicantName: applicantProfile.applicantName || "",
@@ -78,10 +98,50 @@ export function LetterDraftPanel({
     relationshipToApplicant: recommender.relationshipToApplicant || "",
   });
 
+  const perspectiveQuestions = PERSPECTIVE_QUESTIONS[recommender.recommenderType] ?? [];
+
+  const [applicantDraftAnswers, setApplicantDraftAnswers] = useState<ApplicantDraftAnswers>({
+    applicantFullName: applicantProfile.applicantName || "",
+    programType: "",
+    schoolsOrApplicationType: "",
+    careerGoal: "",
+    personalQualities: "",
+    achievements: "",
+    recommenderFullName: recommender.name || "",
+    recommenderTitle: recommender.role || "",
+    recommenderInstitution: recommender.institution || "",
+    relationshipToApplicant: recommender.relationshipToApplicant || "",
+    howLongKnown: "",
+    contextKnown: "",
+    academicExamples: "",
+    clinicalExamples: "",
+    patientInteraction: "",
+    workEthic: "",
+    leadership: "",
+    reliability: "",
+    professionalism: "",
+    growthOverTime: "",
+    realStoriesObservations: "",
+    voiceSentences: "",
+    writingSample: "",
+    perspectiveAnswers: Object.fromEntries(perspectiveQuestions.map((q) => [q.id, ""])),
+  });
+
   const updateGuided = <K extends keyof GuidedLetterAnswers>(key: K, value: GuidedLetterAnswers[K]) =>
     setGuidedAnswers((prev) => ({ ...prev, [key]: value }));
 
-  const generateDraft = async (body: Record<string, unknown>) => {
+  const updateApplicantDraft = <K extends keyof ApplicantDraftAnswers>(
+    key: K,
+    value: ApplicantDraftAnswers[K]
+  ) => setApplicantDraftAnswers((prev) => ({ ...prev, [key]: value }));
+
+  const updatePerspectiveAnswer = (questionId: string, value: string) =>
+    setApplicantDraftAnswers((prev) => ({
+      ...prev,
+      perspectiveAnswers: { ...prev.perspectiveAnswers, [questionId]: value },
+    }));
+
+  const generateDraft = async (body: Record<string, unknown>, author: DraftAuthor = "recommender") => {
     setGenerating(true);
     setError(null);
     setSavedMessage(null);
@@ -89,18 +149,15 @@ export function LetterDraftPanel({
       const idToken = await getIdToken();
       const response = await fetch("/api/recommendations/draft-letter", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${idToken}`,
-        },
+        headers: { "content-type": "application/json", authorization: `Bearer ${idToken}` },
         body: JSON.stringify(body),
       });
       const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error ?? "Failed to generate letter draft");
-      }
+      if (!response.ok) throw new Error(data.error ?? "Failed to generate letter draft");
       setContent(data.content);
       setVoiceMatchScore(data.voiceMatchScore ?? null);
+      setGeneratedBy(author);
+      setApprovalStatus("drafted");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate letter draft");
     } finally {
@@ -137,7 +194,20 @@ export function LetterDraftPanel({
       guidedAnswers,
     });
 
-  const handleRefine = async (action: "professional" | "shorten" | "strengthen", label: string) => {
+  const handleGenerateApplicantDraft = () =>
+    generateDraft(
+      {
+        mode: "applicant_draft",
+        recommender,
+        letterType,
+        applicantProfile,
+        applicantName: applicantDraftAnswers.applicantFullName || applicantProfile.applicantName || "the applicant",
+        applicantDraftAnswers,
+      },
+      "applicant"
+    );
+
+  const handleRefine = async (action: string, label: string) => {
     setRefining(label);
     setError(null);
     setSavedMessage(null);
@@ -145,22 +215,26 @@ export function LetterDraftPanel({
       const idToken = await getIdToken();
       const response = await fetch("/api/recommendations/refine-letter", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${idToken}`,
-        },
+        headers: { "content-type": "application/json", authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ content, action }),
       });
       const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error ?? "Failed to refine letter");
-      }
+      if (!response.ok) throw new Error(data.error ?? "Failed to refine letter");
       setContent(data.content);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to refine letter");
     } finally {
       setRefining(null);
     }
+  };
+
+  const handleAddReviewHeader = () => {
+    if (!content.startsWith("[DRAFT")) setContent(REVIEW_HEADER + content);
+    setApprovalStatus("pending_review");
+  };
+
+  const handleRemoveReviewHeader = () => {
+    setContent((c) => (c.startsWith("[DRAFT") ? c.replace(REVIEW_HEADER, "") : c));
   };
 
   const handleSave = async () => {
@@ -172,6 +246,8 @@ export function LetterDraftPanel({
         letterType,
         content,
         voiceMatchScore,
+        draftedBy: generatedBy,
+        approvalStatus: generatedBy === "applicant" ? approvalStatus : undefined,
       });
       await logClientEvent(getIdToken, "save_letter_draft", { recommenderId: recommender.id });
       setSavedMessage("Draft saved.");
@@ -196,13 +272,49 @@ export function LetterDraftPanel({
 
       {error && <ErrorMessage message={error} />}
 
+      {/* ── Top-level mode choice ── */}
       {mode === "choose" && (
         <div className="space-y-3">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Already have voice and personality details filled in for this recommender? Generate a
-            draft straight from that. Otherwise, pick one of the options below — built for
-            recommenders who are busy, don&apos;t like writing, or don&apos;t know how to start.
-          </p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">Who is writing this letter?</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <button
+              onClick={() => setMode("recommender_choose")}
+              className="rounded-xl border border-zinc-200 bg-white p-5 text-left transition hover:border-zinc-400 hover:shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-500"
+            >
+              <p className="font-semibold text-zinc-900 dark:text-zinc-50">I&apos;m the recommender</p>
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                I&apos;m the dentist, professor, employer, or mentor writing this letter myself.
+              </p>
+            </button>
+            <button
+              onClick={() => setMode("applicant_draft")}
+              className="rounded-xl border border-zinc-200 bg-white p-5 text-left transition hover:border-zinc-400 hover:shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-500"
+            >
+              <p className="font-semibold text-zinc-900 dark:text-zinc-50">
+                My recommender asked me to prepare a draft
+              </p>
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                I&apos;m the applicant. My recommender told me to write a draft for them to review and approve.
+              </p>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Recommender workflow selection ── */}
+      {mode === "recommender_choose" && (
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Already have voice and personality details filled in? Generate straight from that — or pick one of the options below for recommenders who are busy or don&apos;t know how to start.
+            </p>
+            <button
+              onClick={() => setMode("choose")}
+              className="shrink-0 text-xs text-zinc-500 hover:underline dark:text-zinc-400"
+            >
+              ← Back
+            </button>
+          </div>
           <div className="flex flex-wrap gap-3">
             <Button onClick={handleGenerateFromProfile} loading={generating} variant="secondary">
               Generate Letter Draft (from voice &amp; personality)
@@ -217,11 +329,10 @@ export function LetterDraftPanel({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Write 2-5 sentences in your own words — we&apos;ll improve the grammar, keep your
-              voice, and expand it into a complete letter.
+              Write 2–5 sentences in your own words — we&apos;ll improve the grammar, keep your voice, and expand it into a complete letter.
             </h3>
             <button
-              onClick={() => setMode("choose")}
+              onClick={() => setMode("recommender_choose")}
               className="text-xs text-zinc-500 hover:underline dark:text-zinc-400"
             >
               ← Back
@@ -242,11 +353,10 @@ export function LetterDraftPanel({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Answer a few simple questions — you don&apos;t need to write a draft. We&apos;ll
-              generate the full letter from your answers.
+              Answer a few simple questions — we&apos;ll generate the full letter from your answers.
             </h3>
             <button
-              onClick={() => setMode("choose")}
+              onClick={() => setMode("recommender_choose")}
               className="text-xs text-zinc-500 hover:underline dark:text-zinc-400"
             >
               ← Back
@@ -256,24 +366,15 @@ export function LetterDraftPanel({
           {GUIDED_QUESTIONS.map((q) => (
             <FieldGroup key={q.key} label={q.label}>
               {q.multiline ? (
-                <Textarea
-                  value={guidedAnswers[q.key]}
-                  onChange={(e) => updateGuided(q.key, e.target.value)}
-                />
+                <Textarea value={guidedAnswers[q.key]} onChange={(e) => updateGuided(q.key, e.target.value)} />
               ) : (
-                <Input
-                  value={guidedAnswers[q.key]}
-                  onChange={(e) => updateGuided(q.key, e.target.value)}
-                />
+                <Input value={guidedAnswers[q.key]} onChange={(e) => updateGuided(q.key, e.target.value)} />
               )}
             </FieldGroup>
           ))}
 
           <FieldGroup label="Desired tone">
-            <Select
-              value={guidedAnswers.desiredTone}
-              onChange={(e) => updateGuided("desiredTone", e.target.value)}
-            >
+            <Select value={guidedAnswers.desiredTone} onChange={(e) => updateGuided("desiredTone", e.target.value)}>
               {TONE_OPTIONS.map((tone) => (
                 <option key={tone} value={tone}>
                   {tone.charAt(0).toUpperCase() + tone.slice(1)}
@@ -288,8 +389,233 @@ export function LetterDraftPanel({
         </div>
       )}
 
+      {/* ── Applicant draft mode ── */}
+      {mode === "applicant_draft" && (
+        <div className="space-y-2">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                Applicant Drafting for Recommender
+              </p>
+              <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
+                Use this mode only when your recommender has asked you to prepare a draft. The recommender must review, edit, approve, and submit the final letter.
+              </p>
+            </div>
+            <button
+              onClick={() => setMode("choose")}
+              className="shrink-0 text-xs text-zinc-500 hover:underline dark:text-zinc-400"
+            >
+              ← Back
+            </button>
+          </div>
+
+          <SectionHeading>Applicant Information</SectionHeading>
+          <FieldGroup label="Applicant's full name">
+            <Input
+              value={applicantDraftAnswers.applicantFullName}
+              onChange={(e) => updateApplicantDraft("applicantFullName", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Program type (e.g., Dental School, Medical School, Graduate Program)">
+            <Input
+              value={applicantDraftAnswers.programType}
+              onChange={(e) => updateApplicantDraft("programType", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Schools or application type">
+            <Input
+              value={applicantDraftAnswers.schoolsOrApplicationType}
+              onChange={(e) => updateApplicantDraft("schoolsOrApplicationType", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Career goal">
+            <Textarea
+              value={applicantDraftAnswers.careerGoal}
+              onChange={(e) => updateApplicantDraft("careerGoal", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Personal qualities the recommender would highlight">
+            <Textarea
+              value={applicantDraftAnswers.personalQualities}
+              onChange={(e) => updateApplicantDraft("personalQualities", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Relevant achievements, experiences, or accomplishments">
+            <Textarea
+              value={applicantDraftAnswers.achievements}
+              onChange={(e) => updateApplicantDraft("achievements", e.target.value)}
+            />
+          </FieldGroup>
+
+          <SectionHeading>Recommender Information</SectionHeading>
+          <FieldGroup label="Recommender's full name">
+            <Input
+              value={applicantDraftAnswers.recommenderFullName}
+              onChange={(e) => updateApplicantDraft("recommenderFullName", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Recommender's title">
+            <Input
+              value={applicantDraftAnswers.recommenderTitle}
+              onChange={(e) => updateApplicantDraft("recommenderTitle", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Institution, clinic, or company">
+            <Input
+              value={applicantDraftAnswers.recommenderInstitution}
+              onChange={(e) => updateApplicantDraft("recommenderInstitution", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Recommender's relationship to you">
+            <Input
+              value={applicantDraftAnswers.relationshipToApplicant}
+              onChange={(e) => updateApplicantDraft("relationshipToApplicant", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="How long have they known you?">
+            <Input
+              value={applicantDraftAnswers.howLongKnown}
+              onChange={(e) => updateApplicantDraft("howLongKnown", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Context or setting (class, clinic, research lab, workplace...)">
+            <Input
+              value={applicantDraftAnswers.contextKnown}
+              onChange={(e) => updateApplicantDraft("contextKnown", e.target.value)}
+            />
+          </FieldGroup>
+
+          <SectionHeading>Evidence &amp; Examples</SectionHeading>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Share specific things your recommender observed. Nothing will be invented — only what you provide here will appear in the letter.
+          </p>
+          <FieldGroup label="Academic examples (performance, discipline, intellectual curiosity)">
+            <Textarea
+              value={applicantDraftAnswers.academicExamples}
+              onChange={(e) => updateApplicantDraft("academicExamples", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Clinical, lab, or field examples (procedures, research, hands-on work)">
+            <Textarea
+              value={applicantDraftAnswers.clinicalExamples}
+              onChange={(e) => updateApplicantDraft("clinicalExamples", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Patient or client interaction">
+            <Textarea
+              value={applicantDraftAnswers.patientInteraction}
+              onChange={(e) => updateApplicantDraft("patientInteraction", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Work ethic">
+            <Textarea
+              value={applicantDraftAnswers.workEthic}
+              onChange={(e) => updateApplicantDraft("workEthic", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Leadership">
+            <Textarea
+              value={applicantDraftAnswers.leadership}
+              onChange={(e) => updateApplicantDraft("leadership", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Reliability">
+            <Textarea
+              value={applicantDraftAnswers.reliability}
+              onChange={(e) => updateApplicantDraft("reliability", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Professionalism">
+            <Textarea
+              value={applicantDraftAnswers.professionalism}
+              onChange={(e) => updateApplicantDraft("professionalism", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Growth over time">
+            <Textarea
+              value={applicantDraftAnswers.growthOverTime}
+              onChange={(e) => updateApplicantDraft("growthOverTime", e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Real stories or specific observations (the more specific, the better)">
+            <Textarea
+              value={applicantDraftAnswers.realStoriesObservations}
+              onChange={(e) => updateApplicantDraft("realStoriesObservations", e.target.value)}
+            />
+          </FieldGroup>
+
+          {perspectiveQuestions.length > 0 && (
+            <>
+              <SectionHeading>
+                Recommender&apos;s Perspective —{" "}
+                {recommender.recommenderType.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+              </SectionHeading>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                What would your recommender say about each area? Share their specific observations or anything they mentioned to you directly.
+              </p>
+              {perspectiveQuestions.map((q) => (
+                <FieldGroup key={q.id} label={q.question}>
+                  <Textarea
+                    value={applicantDraftAnswers.perspectiveAnswers[q.id] ?? ""}
+                    onChange={(e) => updatePerspectiveAnswer(q.id, e.target.value)}
+                  />
+                </FieldGroup>
+              ))}
+            </>
+          )}
+
+          <SectionHeading>Recommender&apos;s Voice</SectionHeading>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Help us write in your recommender&apos;s natural voice. This keeps the draft sounding authentic rather than generic.
+          </p>
+          <FieldGroup label="Write 2–5 sentences the way your recommender talks or writes (use their phrasing if you can)">
+            <Textarea
+              value={applicantDraftAnswers.voiceSentences}
+              onChange={(e) => updateApplicantDraft("voiceSentences", e.target.value)}
+              placeholder={"e.g. \"She was one of the most prepared students I've worked with. Every time I walked into the clinic, she was already set up and ready to go...\""}
+
+            />
+          </FieldGroup>
+          <FieldGroup label="Optional — paste a prior email, note, or evaluation from this recommender (only if they authorized you to use it)">
+            <Textarea
+              value={applicantDraftAnswers.writingSample}
+              onChange={(e) => updateApplicantDraft("writingSample", e.target.value)}
+            />
+          </FieldGroup>
+
+          <Button onClick={handleGenerateApplicantDraft} loading={generating} className="mt-4">
+            Generate Draft for Recommender Review
+          </Button>
+        </div>
+      )}
+
+      {/* ── Generated content ── */}
       {content && (
         <div className="space-y-3">
+          {generatedBy === "applicant" && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  Applicant-Prepared Draft — Pending Recommender Review
+                </p>
+                <select
+                  value={approvalStatus}
+                  onChange={(e) => setApprovalStatus(e.target.value as DraftApprovalStatus)}
+                  className="rounded border border-amber-300 bg-white px-2 py-1 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-100"
+                >
+                  {Object.entries(APPROVAL_STATUS_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                The recommender must review, edit, approve, and submit this letter. Do not present it as final until the recommender has approved it.
+              </p>
+            </div>
+          )}
+
           <FieldGroup label="Draft (editable)">
             <Textarea
               className="min-h-64"
@@ -304,13 +630,13 @@ export function LetterDraftPanel({
             </p>
           )}
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               onClick={() => handleRefine("professional", "professional")}
               loading={refining === "professional"}
               variant="secondary"
             >
-              Make It More Professional
+              Make More Professional
             </Button>
             <Button
               onClick={() => handleRefine("shorten", "shorten")}
@@ -326,6 +652,23 @@ export function LetterDraftPanel({
             >
               Strengthen Letter
             </Button>
+            <Button
+              onClick={() => handleRefine("add_examples", "add_examples")}
+              loading={refining === "add_examples"}
+              variant="secondary"
+            >
+              Sharpen Specifics
+            </Button>
+            {generatedBy === "applicant" && (
+              <>
+                <Button onClick={handleAddReviewHeader} variant="secondary">
+                  Recommender Review Version
+                </Button>
+                <Button onClick={handleRemoveReviewHeader} variant="secondary">
+                  Final Approval Copy
+                </Button>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -333,9 +676,7 @@ export function LetterDraftPanel({
               Save Draft
             </Button>
             {savedMessage && (
-              <span className="text-sm text-emerald-600 dark:text-emerald-400">
-                {savedMessage}
-              </span>
+              <span className="text-sm text-emerald-600 dark:text-emerald-400">{savedMessage}</span>
             )}
           </div>
         </div>
